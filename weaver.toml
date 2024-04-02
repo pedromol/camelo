@@ -1,0 +1,9 @@
+[serviceweaver]
+binary = "./main"
+rollout = "1m"
+
+[single]
+listeners.tags = {address = "0.0.0.0:8080"}
+
+[multi]
+listeners.tags = {address = "0.0.0.0:8080"}

@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: camelo
+  labels:
+    name: camelo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: camelo
+  namespace: camelo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: camelo
+  template:
+    metadata:
+      labels:
+        app: camelo
+      containers:
+        - name: camelo
+          image: pedromol/camelo
+          ports:
+            - containerPort: 8080
+          env:
+            - name: HOMEASSISTANT_AUTH
+              value: 'Bearer TOKEN'
+            - name: HOMEASSISTANT_HOST
+              value: 'http://homeassistant.homeassistant.svc:8123'
+            - name: DYNAMODB_HOST
+              value: 'http://dynamodb.dynamodb.svc:8000'
+            - name: SERVICEWEAVER_CONFIG
+              value: '/weaver.toml'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: camelo
+  namespace: camelo
+  labels:
+    app: camelo
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: camelo
