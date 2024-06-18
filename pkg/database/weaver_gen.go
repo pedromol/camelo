@@ -18,12 +18,12 @@ func init() {
 	codegen.Register(codegen.Registration{
 		Name:  "github.com/pedromol/camelo/pkg/database/Database",
 		Iface: reflect.TypeOf((*Database)(nil)).Elem(),
-		Impl:  reflect.TypeOf(DynamoDB{}),
+		Impl:  reflect.TypeOf(MongoDB{}),
 		LocalStubFn: func(impl any, caller string, tracer trace.Tracer) any {
-			return database_local_stub{impl: impl.(Database), tracer: tracer, getMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/pedromol/camelo/pkg/database/Database", Method: "Get", Remote: false}), initMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/pedromol/camelo/pkg/database/Database", Method: "Init", Remote: false}), upsertMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/pedromol/camelo/pkg/database/Database", Method: "Upsert", Remote: false})}
+			return database_local_stub{impl: impl.(Database), tracer: tracer, getMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/pedromol/camelo/pkg/database/Database", Method: "Get", Remote: false}), healthMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/pedromol/camelo/pkg/database/Database", Method: "Health", Remote: false}), initMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/pedromol/camelo/pkg/database/Database", Method: "Init", Remote: false}), upsertMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/pedromol/camelo/pkg/database/Database", Method: "Upsert", Remote: false})}
 		},
 		ClientStubFn: func(stub codegen.Stub, caller string) any {
-			return database_client_stub{stub: stub, getMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/pedromol/camelo/pkg/database/Database", Method: "Get", Remote: true}), initMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/pedromol/camelo/pkg/database/Database", Method: "Init", Remote: true}), upsertMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/pedromol/camelo/pkg/database/Database", Method: "Upsert", Remote: true})}
+			return database_client_stub{stub: stub, getMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/pedromol/camelo/pkg/database/Database", Method: "Get", Remote: true}), healthMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/pedromol/camelo/pkg/database/Database", Method: "Health", Remote: true}), initMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/pedromol/camelo/pkg/database/Database", Method: "Init", Remote: true}), upsertMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/pedromol/camelo/pkg/database/Database", Method: "Upsert", Remote: true})}
 		},
 		ServerStubFn: func(impl any, addLoad func(uint64, float64)) codegen.Server {
 			return database_server_stub{impl: impl.(Database), addLoad: addLoad}
@@ -36,10 +36,10 @@ func init() {
 }
 
 // weaver.InstanceOf checks.
-var _ weaver.InstanceOf[Database] = (*DynamoDB)(nil)
+var _ weaver.InstanceOf[Database] = (*MongoDB)(nil)
 
 // weaver.Router checks.
-var _ weaver.Unrouted = (*DynamoDB)(nil)
+var _ weaver.Unrouted = (*MongoDB)(nil)
 
 // Local stub implementations.
 
@@ -47,6 +47,7 @@ type database_local_stub struct {
 	impl          Database
 	tracer        trace.Tracer
 	getMetrics    *codegen.MethodMetrics
+	healthMetrics *codegen.MethodMetrics
 	initMetrics   *codegen.MethodMetrics
 	upsertMetrics *codegen.MethodMetrics
 }
@@ -72,6 +73,26 @@ func (s database_local_stub) Get(ctx context.Context, a0 string) (r0 model.Tag, 
 	}
 
 	return s.impl.Get(ctx, a0)
+}
+
+func (s database_local_stub) Health(ctx context.Context) (err error) {
+	// Update metrics.
+	begin := s.healthMetrics.Begin()
+	defer func() { s.healthMetrics.End(begin, err != nil, 0, 0) }()
+	span := trace.SpanFromContext(ctx)
+	if span.SpanContext().IsValid() {
+		// Create a child span for this method.
+		ctx, span = s.tracer.Start(ctx, "database.Database.Health", trace.WithSpanKind(trace.SpanKindInternal))
+		defer func() {
+			if err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+			}
+			span.End()
+		}()
+	}
+
+	return s.impl.Health(ctx)
 }
 
 func (s database_local_stub) Init(ctx context.Context) (err error) {
@@ -119,6 +140,7 @@ func (s database_local_stub) Upsert(ctx context.Context, a0 model.Tag) (err erro
 type database_client_stub struct {
 	stub          codegen.Stub
 	getMetrics    *codegen.MethodMetrics
+	healthMetrics *codegen.MethodMetrics
 	initMetrics   *codegen.MethodMetrics
 	upsertMetrics *codegen.MethodMetrics
 }
@@ -182,6 +204,52 @@ func (s database_client_stub) Get(ctx context.Context, a0 string) (r0 model.Tag,
 	return
 }
 
+func (s database_client_stub) Health(ctx context.Context) (err error) {
+	// Update metrics.
+	var requestBytes, replyBytes int
+	begin := s.healthMetrics.Begin()
+	defer func() { s.healthMetrics.End(begin, err != nil, requestBytes, replyBytes) }()
+
+	span := trace.SpanFromContext(ctx)
+	if span.SpanContext().IsValid() {
+		// Create a child span for this method.
+		ctx, span = s.stub.Tracer().Start(ctx, "database.Database.Health", trace.WithSpanKind(trace.SpanKindClient))
+	}
+
+	defer func() {
+		// Catch and return any panics detected during encoding/decoding/rpc.
+		if err == nil {
+			err = codegen.CatchPanics(recover())
+			if err != nil {
+				err = errors.Join(weaver.RemoteCallError, err)
+			}
+		}
+
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+		}
+		span.End()
+
+	}()
+
+	var shardKey uint64
+
+	// Call the remote method.
+	var results []byte
+	results, err = s.stub.Run(ctx, 1, nil, shardKey)
+	replyBytes = len(results)
+	if err != nil {
+		err = errors.Join(weaver.RemoteCallError, err)
+		return
+	}
+
+	// Decode the results.
+	dec := codegen.NewDecoder(results)
+	err = dec.Error()
+	return
+}
+
 func (s database_client_stub) Init(ctx context.Context) (err error) {
 	// Update metrics.
 	var requestBytes, replyBytes int
@@ -215,7 +283,7 @@ func (s database_client_stub) Init(ctx context.Context) (err error) {
 
 	// Call the remote method.
 	var results []byte
-	results, err = s.stub.Run(ctx, 1, nil, shardKey)
+	results, err = s.stub.Run(ctx, 2, nil, shardKey)
 	replyBytes = len(results)
 	if err != nil {
 		err = errors.Join(weaver.RemoteCallError, err)
@@ -265,7 +333,7 @@ func (s database_client_stub) Upsert(ctx context.Context, a0 model.Tag) (err err
 	// Call the remote method.
 	requestBytes = len(enc.Data())
 	var results []byte
-	results, err = s.stub.Run(ctx, 2, enc.Data(), shardKey)
+	results, err = s.stub.Run(ctx, 3, enc.Data(), shardKey)
 	replyBytes = len(results)
 	if err != nil {
 		err = errors.Join(weaver.RemoteCallError, err)
@@ -316,6 +384,8 @@ func (s database_server_stub) GetStubFn(method string) func(ctx context.Context,
 	switch method {
 	case "Get":
 		return s.get
+	case "Health":
+		return s.health
 	case "Init":
 		return s.init
 	case "Upsert":
@@ -346,6 +416,25 @@ func (s database_server_stub) get(ctx context.Context, args []byte) (res []byte,
 	// Encode the results.
 	enc := codegen.NewEncoder()
 	(r0).WeaverMarshal(enc)
+	enc.Error(appErr)
+	return enc.Data(), nil
+}
+
+func (s database_server_stub) health(ctx context.Context, args []byte) (res []byte, err error) {
+	// Catch and return any panics detected during encoding/decoding/rpc.
+	defer func() {
+		if err == nil {
+			err = codegen.CatchPanics(recover())
+		}
+	}()
+
+	// TODO(rgrandl): The deferred function above will recover from panics in the
+	// user code: fix this.
+	// Call the local method.
+	appErr := s.impl.Health(ctx)
+
+	// Encode the results.
+	enc := codegen.NewEncoder()
 	enc.Error(appErr)
 	return enc.Data(), nil
 }
@@ -404,6 +493,11 @@ var _ Database = (*database_reflect_stub)(nil)
 
 func (s database_reflect_stub) Get(ctx context.Context, a0 string) (r0 model.Tag, err error) {
 	err = s.caller("Get", ctx, []any{a0}, []any{&r0})
+	return
+}
+
+func (s database_reflect_stub) Health(ctx context.Context) (err error) {
+	err = s.caller("Health", ctx, []any{}, []any{})
 	return
 }
 

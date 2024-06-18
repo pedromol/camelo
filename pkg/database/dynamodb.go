@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/ServiceWeaver/weaver"
+	// "github.com/ServiceWeaver/weaver"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -17,7 +17,7 @@ import (
 )
 
 type DynamoDB struct {
-	weaver.Implements[Database]
+	// weaver.Implements[Database]
 	Client *dynamodb.Client
 }
 
@@ -64,11 +64,8 @@ func (h DynamoDB) migrate(ctx context.Context) error {
 			WriteCapacityUnits: aws.Int64(10),
 		},
 	})
-	waiter := dynamodb.NewTableExistsWaiter(h.Client)
-	err := waiter.Wait(ctx, &dynamodb.DescribeTableInput{
-		TableName: aws.String("camelo")}, 5*time.Minute)
 
-	return err
+	return h.Health(ctx)
 }
 
 func (h DynamoDB) Get(ctx context.Context, id string) (model.Tag, error) {
@@ -101,4 +98,9 @@ func (h DynamoDB) Upsert(ctx context.Context, model model.Tag) error {
 		},
 	})
 	return err
+}
+
+func (h DynamoDB) Health(ctx context.Context) error {
+	return dynamodb.NewTableExistsWaiter(h.Client).Wait(ctx, &dynamodb.DescribeTableInput{
+		TableName: aws.String("camelo")}, 5*time.Minute)
 }
